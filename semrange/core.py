@@ -11,7 +11,7 @@ class Counter:
 def parse(text):
     body = text
     if "-" in body:
-        body = body.split("-", 1)[0]
+        return None
     parts = body.split(".")
     if len(parts) != 3:
         return None
@@ -21,8 +21,7 @@ def parse(text):
         return None
 
 
-def satisfies(version, expr):
-    cond = expr.split()[0]
+def _check(version, cond):
     op = "="
     for candidate in (">=", "<=", ">", "<", "="):
         if cond.startswith(candidate):
@@ -42,23 +41,25 @@ def satisfies(version, expr):
     return version == want
 
 
+def satisfies(version, expr):
+    return all(_check(version, cond) for cond in expr.split())
+
+
 def report(candidates, expr, counter):
     matched = []
+    seen = set()
     for text in candidates:
+        counter.scanned += 1
         version = parse(text)
         if version is None:
             continue
         if not satisfies(version, expr):
             continue
-        dup = False
-        for seen, _ in matched:
-            counter.scanned += 1
-            if seen == version:
-                dup = True
-                break
-        if not dup:
-            matched.append((version, text))
-    matched.sort(key=lambda item: item[1])
+        if version in seen:
+            continue
+        seen.add(version)
+        matched.append((version, text))
+    matched.sort(key=lambda item: item[0])
     return {
         "matched": [text for _, text in matched],
         "best": matched[-1][1] if matched else None,
